@@ -1,0 +1,61 @@
+name: QA
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  qa:
+    name: QA
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright
+        run: npx playwright install chromium --with-deps
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Read .claude/agents/qa.md and follow its instructions exactly.
+
+            PR to QA: #${{ github.event.pull_request.number }}
+            Repo: ${{ github.repository }}
+
+            Environment: The repo is checked out at the PR head. Node 20 is available.
+            Dependencies are installed. Playwright chromium is installed.
+
+            Important CI constraints:
+            - Use headless Playwright with `chromiumSandbox: false` (required in CI)
+            - Upload screenshots to a GitHub release for embedding in comments:
+              ```
+              gh release create _screenshots --repo ${{ github.repository }} --title "QA Screenshots" --notes "" 2>/dev/null || true
+              gh release upload _screenshots /tmp/qa-screenshot.png --repo ${{ github.repository }} --clobber
+              ```
+            - Embed screenshots in the PR comment as markdown images
+
+            Steps:
+            1. Read the linked issue to understand requirements
+            2. Follow the QA agent instructions (quality gates, runtime verification, UX completeness, screenshots)
+            3. Post your verdict as a PR comment:
+               `gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body "..."`
+
+            Verdict must be one of: PASS / FAIL
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

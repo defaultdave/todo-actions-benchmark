@@ -1,0 +1,52 @@
+name: Benchmark Score
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  score:
+    name: Score Phase
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Read .claude/agents/benchmark.md and follow its instructions to score this completed phase.
+
+            Merged PR: #${{ github.event.pull_request.number }}
+            PR title: ${{ github.event.pull_request.title }}
+            Repo: ${{ github.repository }}
+
+            Steps:
+            1. Get the merged diff: `gh pr diff ${{ github.event.pull_request.number }}`
+            2. Read the PR comments to find the Review verdict and QA verdict
+            3. Run the test suite to verify: `npm test`
+            4. Score the phase using the v2 rubric in benchmark.md (6 dimensions, max 18 pts)
+            5. Post the scorecard as a comment on the merged PR:
+               `gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body "..."`
+            6. Determine the next phase from the benchmark spec in benchmark.md
+               - If there are remaining phases, create the next issue:
+                 `gh issue create --title "Phase N: [title]" --body "[full spec]" --repo ${{ github.repository }}`
+               - If all 4 phases are complete, post a final benchmark report as an issue comment instead
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
