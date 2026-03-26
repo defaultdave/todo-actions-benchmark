@@ -1,0 +1,48 @@
+name: Senior (Implement)
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  implement:
+    name: Implement
+    runs-on: ubuntu-latest
+    # Only trigger on issue comments (not PR comments) containing @claude
+    if: |
+      github.event.issue.pull_request == null &&
+      contains(github.event.comment.body, '@claude')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Read .claude/agents/senior.md and follow its instructions to implement issue #${{ github.event.issue.number }}.
+
+            Issue title: ${{ github.event.issue.title }}
+            Issue URL: ${{ github.event.issue.html_url }}
+            Repo: ${{ github.repository }}
+
+            Steps:
+            1. Read the full issue body: `gh issue view ${{ github.event.issue.number }} --repo ${{ github.repository }}`
+            2. Echo scope acknowledgment before writing any code
+            3. Create a branch: `git checkout -b phase-${{ github.event.issue.number }}/implement`
+            4. Implement per the senior agent instructions (code + tests + docs + quality gates + runtime smoke test)
+            5. Commit and push
+            6. Open a PR targeting main with `Closes #${{ github.event.issue.number }}` in the body
+            7. Report completion with PR URL
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
