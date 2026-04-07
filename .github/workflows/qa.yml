@@ -60,3 +60,4 @@ jobs:
             Verdict must be one of: PASS / FAIL
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
